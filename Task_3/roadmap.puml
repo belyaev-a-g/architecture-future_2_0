@@ -1,0 +1,61 @@
+@startgantt roadmap
+title Роадмап
+
+printscale quarterly
+projectscale quarterly
+
+Project starts 2026-06-01
+
+-- Этап 1: Пилот (0–2 мес.) --
+
+[(команда архитекторов) Архитектурное решение по трансформации сформировано и согласовано] starts 2026-07-01 and ends 2026-09-01
+[(команда архитекторов) Архитектурное решение по трансформации сформировано и согласовано] is colored in #BA55D3
+
+[(команда архитекторов) Границы доменов определены, а ключевые связи между ними описаны.] starts 2026-08-01 and ends 2026-09-01
+[(команда архитекторов) Границы доменов определены, а ключевые связи между ними описаны.] is colored in #BA55D3
+
+[(команда архитекторов) В доменах запланированы конкретные проекты по развитию «витрины данных».] starts 2026-09-01 and ends 2026-10-01
+[(команда архитекторов) В доменах запланированы конкретные проекты по развитию «витрины данных».] is colored in #BA55D3
+
+-- Этап 2: Финальное состояние (2–14 мес.) --
+
+[(инфраструктурная команда) Развёртывание платформы\n(Kubernetes, Kafka, Schema Registry)] starts 2026-09-01 and ends 2026-11-01
+[(инфраструктурная команда) Развёртывание платформы\n(Kubernetes, Kafka, Schema Registry)] is colored in #438DD5
+
+[(инфраструктурная команда) Развёртывание и настройка нового DWH] starts 2026-09-01 and ends 2026-11-01
+[(инфраструктурная команда) Развёртывание и настройка нового DWH] is colored in #438DD5
+
+[(инфраструктурная команда) Развёртывание и настройка API Gateway\n(Kong)] starts 2026-10-01 and ends 2026-11-01
+[(инфраструктурная команда) Развёртывание и настройка API Gateway\n(Kong)] is colored in #438DD5
+
+[(data команда) Разработка CDC Service\n(Airflow)] starts 2026-10-01 and ends 2026-11-01
+[(data команда) Разработка CDC Service\n(Airflow)] is colored in #438DD5
+
+[(инфраструктурная команда) Развёртывание и настройка IAM\n(Keycloak)] starts 2026-10-01 and ends 2026-12-01
+[(инфраструктурная команда) Развёртывание и настройка IAM\n(Keycloak)] is colored in #438DD5
+
+[Разработка: Integration Service] starts 2026-10-01 and ends 2026-12-01
+[Разработка: Integration Service] is colored in #2E8B57
+
+[Разработка: Веб-приложения] starts 2026-12-01 and ends 2027-02-01
+[Разработка: Веб-приложения] is colored in #2E8B57
+
+[Разработка: Client Service] starts 2026-12-01 and ends 2027-08-01
+[Разработка: Client Service] is colored in #2E8B57
+
+[Разработка: Self-service Portal] starts 2027-03-01 and ends 2027-07-01
+[Разработка: Self-service Portal] is colored in #2E8B57
+
+[Разработка: Fintech Service] starts 2027-01-01 and ends 2027-10-01
+[Разработка: Fintech Service] is colored in #2E8B57
+
+[(инфраструктурная команда)Вывод legacy services\nPower BI] starts 2028-01-01 and ends 2028-02-01
+[(инфраструктурная команда)Вывод legacy services\nPower BI] is colored in #000000
+
+[Разработка: Client Portal] starts 2027-10-01 and ends 2029-01-01
+[Разработка: Client Portal] is colored in #2E8B57
+
+[(инфраструктурная команда)Вывод legacy services\nApache Camel ESB, ACL Service, MS SQL Server] starts 2028-12-01 and ends 2029-01-01
+[(инфраструктурная команда)Вывод legacy services\nApache Camel ESB, ACL Service, MS SQL Server] is colored in #000000
+
+@endgantt
