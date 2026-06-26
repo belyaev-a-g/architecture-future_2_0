@@ -1,0 +1,105 @@
+@startuml
+title Будущее 2.0 - DFD потоков данных между доменами
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowColor #444444
+skinparam RectangleBorderColor #444444
+skinparam RectangleBackgroundColor #F2F2F7
+skinparam DatabaseBorderColor #444444
+skinparam DatabaseBackgroundColor #E2F7FF
+
+left to right direction
+
+actor "Администратор" as operator
+actor "Врач" as doctor
+actor "Бизнес-\nпользователь" as business
+actor "Партнер" as partner
+
+rectangle "Домен Клиники" as clinic #D4EDDA {
+  rectangle "Клиническая\nсистема управления" as clinic_app
+  database "Клиническая\nбаза данных" as clinic_db
+}
+
+rectangle "Медицинский домен" as medic #D4EDDA {
+  rectangle "Врачебная платформа" as medic_app
+  database "Медицинская\nбаза данных" as medic_db
+}
+
+rectangle "ИИ домен" as ai #D4EDDA {
+  rectangle "ИИ-сервисы" as ai_app
+  database "ИИ-репозиторий" as ai_db
+}
+
+rectangle "Финтех домен" as fin #D4EDDA {
+  rectangle "Финтех-\nплатформа" as fin_app
+  database "Финансовое\nхранилище" as fin_db
+}
+
+rectangle "Партнерский домен" as partner_domain #FFF3CD {
+  rectangle "API Gateway" as api
+  rectangle "Партнерские сервисы:\nфарма, оборудование" as partner_services
+}
+
+rectangle "Интеграционный слой" as integration #FFF3CD {
+  queue "Шина событий /\nобменный хаб" as bus
+}
+
+rectangle "Аналитический домен" as analytics #D6EAF8 {
+  database "Аналитическое\nхранилище" as analytical_storage
+  rectangle "Портал\nсамообслуживания" as portal
+  rectangle "BI-\nсистема" as bi
+  rectangle "Каталог данных\nи доступов" as catalog
+}
+
+database "Legacy DWH\nSQL Server 2008" as legacy #E8E8E8
+
+operator --> clinic_app : данные приема,\nрасписание, обращения
+doctor --> medic_app : назначения,\nрезультаты работы врача
+clinic_app --> clinic_db : запись и чтение\nданных клиники
+medic_app --> medic_db : запись и чтение\nданных пациентов, медкарт
+
+clinic_app --> bus : события клиники:\nвизит, счет, статус услуги
+medic_app --> bus : врачебная статистика
+medicc_app --> ai_app : мед. данные\nдля ИИ-сценариев
+ai_app --> ai_db : результаты обработки,\nслужебные данные моделей
+ai_app --> bus : результат ИИ,\nесли его можно использовать дальше
+
+fin_app --> fin_db : счета, кредиты,\nоперации
+fin_app --> bus : финансовые события:\nплатеж, кредит, задолженность
+
+partner --> api : запросы и данные\nот партнеров
+partner_services --> api : данные лекарств,\nоборудования, поставок
+api --> bus : партнерские события\nпосле проверки
+
+bus --> analytical_storage : очищенные данные\nдля отчетности
+legacy --> analytical_storage : исторические и\nсправочные данные
+bus --> legacy : временная поддержка\nстарых интеграций
+
+analytical_storage --> portal : витрины данных
+analytical_storage --> bi : витрины данных
+catalog --> portal : права доступа,\nописание наборов
+catalog --> bi : описание данных
+business --> portal : собирает отчеты
+business --> bi : смотрит дашборды
+
+note bottom of medic_db
+Медицинские карты, истории болезней
+и результаты исследований остаются
+в медицинском контуре.
+end note
+
+note bottom of analytical_storage
+В аналитику попадают только разрешенные
+агрегированные или обезличенные данные.
+end note
+
+note right of legacy
+DWH не является местом для новой логики.
+Он нужен для истории и переходного периода.
+end note
+
+@enduml
