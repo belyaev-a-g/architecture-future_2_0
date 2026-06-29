@@ -16,10 +16,20 @@ provider "aws" {
   skip_metadata_api_check     = true
   skip_requesting_account_id  = true
 
+  s3_use_path_style           = true
+
   # Добавляем API Gateway и IAM
   endpoints {
+    # Добавляем API Gateway
     apigateway = var.localstack_endpoint
+    # Добавляем SSO IAM
     iam        = var.localstack_endpoint
+    # Добавляем S3-хранилище
+    s3         = var.localstack_endpoint
+    # Добавляем SQL-движок Athena
+    athena     = var.localstack_endpoint
+    # Добавляем каталог данных Glue
+    glue       = var.localstack_endpoint
   }
 }
 
@@ -114,4 +124,87 @@ resource "aws_iam_policy" "apigw_logging_policy" {
 resource "aws_iam_role_policy_attachment" "apigw_logs_attach" {
   role       = aws_iam_role.apigw_role.name
   policy_arn = aws_iam_policy.apigw_logging_policy.arn
+}
+
+
+# --- СЕКЦИЯ DATA LAKE ---
+
+# 1. Создаем S3-бакет, где будут лежать наши сырые данные
+resource "aws_s3_bucket" "datalake_bucket" {
+  bucket        = "my-local-datalake"
+  force_destroy = true # Позволит легко удалить бакет при terraform destroy
+}
+
+# 2. Создаем технический бакет для сохранения результатов SQL-запросов Athena
+# Это обязательное требование AWS: Athena всегда сбрасывает логи ответов в S3
+resource "aws_s3_bucket" "athena_results" {
+  bucket        = "my-local-athena-results"
+  force_destroy = true
+}
+
+# 3. Создаем базу данных в каталоге AWS Glue (Каталог метаданных для Athena)
+resource "aws_glue_catalog_database" "analytics_db" {
+  name = "analytics_logs_db"
+}
+
+# 4. Создаем структуру таблицы в Glue Data Catalog.
+# Мы описываем, что в S3 будут лежать файлы с колонками: id, user_id, action, timestamp
+resource "aws_glue_catalog_table" "users_actions_table" {
+  name          = "user_actions"
+  database_name = aws_glue_catalog_database.analytics_db.name
+
+  table_type = "EXTERNAL_TABLE"
+
+  parameters = {
+    "classification" = "csv"
+  }
+
+  storage_descriptor {
+    # Указываем путь к папке внутри бакета, где будут лежать CSV-файлы
+    location      = "s3://${aws_s3_bucket.datalake_bucket.bucket}/raw_events/"
+    input_format  = "org.apache.hadoop.mapred.TextInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+
+    ser_de_info {
+      name                  = "csv"
+      serialization_library = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"
+      parameters = {
+        "field.delim"            = ","
+        "skip.header.line.count" = "1" # Пропускать строку заголовков в CSV
+      }
+    }
+
+    # Описание схемы данных (колонки)
+    columns {
+      name = "id"
+      type = "string"
+    }
+    columns {
+      name = "user_id"
+      type = "string"
+    }
+    columns {
+      name = "action"
+      type = "string"
+    }
+    columns {
+      name = "timestamp"
+      type = "string"
+    }
+  }
+}
+
+# 5. Настраиваем рабочую область Athena (Workgroup)
+resource "aws_athena_workgroup" "local_workgroup" {
+  name = "primary"
+
+  configuration {
+    enforce_workgroup_configuration    = true
+    publish_cloudwatch_metrics_enabled = false
+
+    result_configuration {
+      # Связываем Athena с бакетом для результатов
+      output_location = "s3://${aws_s3_bucket.athena_results.bucket}/"
+    }
+  }
 }

@@ -17,3 +17,19 @@ output "iam_role_arn" {
   value       = aws_iam_role.apigw_role.arn
   description = "ARN созданной IAM роли для API Gateway"
 }
+
+output "datalake_bucket_name" {
+  value       = aws_s3_bucket.datalake_bucket.bucket
+  description = "Имя бакета Data Lake для сырых данных"
+}
+
+output "athena_database_name" {
+  value       = aws_glue_catalog_database.analytics_db.name
+  description = "Имя базы данных в Athena"
+}
+
+output "athena_table_name" {
+  value       = aws_glue_catalog_table.users_actions_table.name
+  description = "Имя таблицы для SQL-запросов"
+}
+
