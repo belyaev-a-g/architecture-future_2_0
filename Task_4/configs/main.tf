@@ -48,7 +48,7 @@ resource "aws_api_gateway_method" "get_users" {
 }
 
 # 4. Имитируем ответ (Mock-интеграция), чтобы API возвращал статус 200 без бэкенда
-resource "aws_api_gateway_integration" "mock_integration" {
+resource "aws_api_gateway_integration" "future_gateway" {
   rest_api_id = aws_api_gateway_rest_api.local_api.id
   resource_id = aws_api_gateway_resource.users_resource.id
   http_method = aws_api_gateway_method.get_users.http_method
