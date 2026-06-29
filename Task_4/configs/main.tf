@@ -16,21 +16,24 @@ provider "aws" {
   skip_metadata_api_check     = true
   skip_requesting_account_id  = true
 
-  # Перенаправляем вызовы API Gateway на MiniStack
+  # Добавляем API Gateway и IAM
   endpoints {
     apigateway = var.localstack_endpoint
+    iam        = var.localstack_endpoint
   }
 }
 
 # 1. Создаем сам REST API
 resource "aws_api_gateway_rest_api" "local_api" {
   name        = var.api_name
-  description = "Локальный API Gateway для тестов"
+  description = "API Gateway"
   
   endpoint_configuration {
     types = ["REGIONAL"]
   }
 }
+
+# --- Секция API Gateway  ---
 
 # 2. Создаем ресурс (путь) /users в нашем API
 resource "aws_api_gateway_resource" "users_resource" {
@@ -59,3 +62,56 @@ resource "aws_api_gateway_integration" "future_gateway" {
   }
 }
 
+# --- Секция IAM ---
+
+# 1. Создаем IAM-роль для API Gateway
+resource "aws_iam_role" "apigw_role" {
+  name = "${var.api_name}-execution-role"
+
+  # Trust Policy: Описываем, КТО имеет право принимать (assume) эту роль.
+  # В нашем случае — сам сервис API Gateway.
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "://amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Environment = "local-dev"
+    ManagedBy   = "Terraform"
+  }
+}
+
+# 2. Создаем политику прав (разрешаем запись логов в CloudWatch)
+resource "aws_iam_policy" "apigw_logging_policy" {
+  name        = "${var.api_name}-logging-policy"
+  description = "Разрешает API Gateway писать логи"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "*" # В реальном облаке здесь должен быть конкретный ARN логов
+      }
+    ]
+  })
+}
+
+# 3. Привязываем политику к созданной роли
+resource "aws_iam_role_policy_attachment" "apigw_logs_attach" {
+  role       = aws_iam_role.apigw_role.name
+  policy_arn = aws_iam_policy.apigw_logging_policy.arn
+}

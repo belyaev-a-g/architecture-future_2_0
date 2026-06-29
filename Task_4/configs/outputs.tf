@@ -13,3 +13,7 @@ output "test_url" {
   description = "Шаблон URL для проверки работоспособности с хост-машины"
 }
 
+output "iam_role_arn" {
+  value       = aws_iam_role.apigw_role.arn
+  description = "ARN созданной IAM роли для API Gateway"
+}
