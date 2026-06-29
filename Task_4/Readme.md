@@ -14,6 +14,10 @@ Ministack позволяет добавить IAM, API Gateway, S3, Athena, Glue
 - [outputs.tf](configs/outputs.tf) - вывод значений после создания.
 - [terraform.tfvars](configs/terraform.tfvars) - пример значений переменных.
 
+### Дополнительные файлы
+- [justification.md](justification.md) - обоснование конфигурации.
+- [docker-compose.yml](docker-compose.yml) - конфигурация связки ministack + terraform для docker compose.
+
 ### Скриншоты работы с terraform:
 #### Terraform init
  ![init.png](screenshots/init.png)  
