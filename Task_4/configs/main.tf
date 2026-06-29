@@ -196,7 +196,7 @@ resource "aws_glue_catalog_table" "users_actions_table" {
 
 # 5. Настраиваем рабочую область Athena (Workgroup)
 resource "aws_athena_workgroup" "local_workgroup" {
-  name = "primary"
+  name = "analytics_workgroup"
 
   configuration {
     enforce_workgroup_configuration    = true
