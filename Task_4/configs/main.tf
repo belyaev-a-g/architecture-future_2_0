@@ -1,0 +1,210 @@
+terraform {
+  required_version = ">= 1.0.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region                      = var.aws_region
+  access_key                  = "mock_access_key"
+  secret_key                  = "mock_secret_key"
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+
+  s3_use_path_style           = true
+
+  # Добавляем API Gateway и IAM
+  endpoints {
+    # Добавляем API Gateway
+    apigateway = var.localstack_endpoint
+    # Добавляем SSO IAM
+    iam        = var.localstack_endpoint
+    # Добавляем S3-хранилище
+    s3         = var.localstack_endpoint
+    # Добавляем SQL-движок Athena
+    athena     = var.localstack_endpoint
+    # Добавляем каталог данных Glue
+    glue       = var.localstack_endpoint
+  }
+}
+
+# 1. Создаем сам REST API
+resource "aws_api_gateway_rest_api" "local_api" {
+  name        = var.api_name
+  description = "API Gateway"
+  
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+}
+
+# --- Секция API Gateway  ---
+
+# 2. Создаем ресурс (путь) /users в нашем API
+resource "aws_api_gateway_resource" "users_resource" {
+  rest_api_id = aws_api_gateway_rest_api.local_api.id
+  parent_id   = aws_api_gateway_rest_api.local_api.root_resource_id
+  path_part   = "users"
+}
+
+# 3. Создаем метод GET для пути /users
+resource "aws_api_gateway_method" "get_users" {
+  rest_api_id   = aws_api_gateway_rest_api.local_api.id
+  resource_id   = aws_api_gateway_resource.users_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+# 4. Имитируем ответ (Mock-интеграция), чтобы API возвращал статус 200 без бэкенда
+resource "aws_api_gateway_integration" "future_gateway" {
+  rest_api_id = aws_api_gateway_rest_api.local_api.id
+  resource_id = aws_api_gateway_resource.users_resource.id
+  http_method = aws_api_gateway_method.get_users.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+# --- Секция IAM ---
+
+# 1. Создаем IAM-роль для API Gateway
+resource "aws_iam_role" "apigw_role" {
+  name = "${var.api_name}-execution-role"
+
+  # Trust Policy: Описываем, КТО имеет право принимать (assume) эту роль.
+  # В нашем случае — сам сервис API Gateway.
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "://amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Environment = "local-dev"
+    ManagedBy   = "Terraform"
+  }
+}
+
+# 2. Создаем политику прав (разрешаем запись логов в CloudWatch)
+resource "aws_iam_policy" "apigw_logging_policy" {
+  name        = "${var.api_name}-logging-policy"
+  description = "Разрешает API Gateway писать логи"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "*" # В реальном облаке здесь должен быть конкретный ARN логов
+      }
+    ]
+  })
+}
+
+# 3. Привязываем политику к созданной роли
+resource "aws_iam_role_policy_attachment" "apigw_logs_attach" {
+  role       = aws_iam_role.apigw_role.name
+  policy_arn = aws_iam_policy.apigw_logging_policy.arn
+}
+
+
+# --- СЕКЦИЯ DATA LAKE ---
+
+# 1. Создаем S3-бакет, где будут лежать наши сырые данные
+resource "aws_s3_bucket" "datalake_bucket" {
+  bucket        = "my-local-datalake"
+  force_destroy = true # Позволит легко удалить бакет при terraform destroy
+}
+
+# 2. Создаем технический бакет для сохранения результатов SQL-запросов Athena
+# Это обязательное требование AWS: Athena всегда сбрасывает логи ответов в S3
+resource "aws_s3_bucket" "athena_results" {
+  bucket        = "my-local-athena-results"
+  force_destroy = true
+}
+
+# 3. Создаем базу данных в каталоге AWS Glue (Каталог метаданных для Athena)
+resource "aws_glue_catalog_database" "analytics_db" {
+  name = "analytics_logs_db"
+}
+
+# 4. Создаем структуру таблицы в Glue Data Catalog.
+# Мы описываем, что в S3 будут лежать файлы с колонками: id, user_id, action, timestamp
+resource "aws_glue_catalog_table" "users_actions_table" {
+  name          = "user_actions"
+  database_name = aws_glue_catalog_database.analytics_db.name
+
+  table_type = "EXTERNAL_TABLE"
+
+  parameters = {
+    "classification" = "csv"
+  }
+
+  storage_descriptor {
+    # Указываем путь к папке внутри бакета, где будут лежать CSV-файлы
+    location      = "s3://${aws_s3_bucket.datalake_bucket.bucket}/raw_events/"
+    input_format  = "org.apache.hadoop.mapred.TextInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+
+    ser_de_info {
+      name                  = "csv"
+      serialization_library = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"
+      parameters = {
+        "field.delim"            = ","
+        "skip.header.line.count" = "1" # Пропускать строку заголовков в CSV
+      }
+    }
+
+    # Описание схемы данных (колонки)
+    columns {
+      name = "id"
+      type = "string"
+    }
+    columns {
+      name = "user_id"
+      type = "string"
+    }
+    columns {
+      name = "action"
+      type = "string"
+    }
+    columns {
+      name = "timestamp"
+      type = "string"
+    }
+  }
+}
+
+# 5. Настраиваем рабочую область Athena (Workgroup)
+resource "aws_athena_workgroup" "local_workgroup" {
+  name = "analytics_workgroup"
+
+  configuration {
+    enforce_workgroup_configuration    = true
+    publish_cloudwatch_metrics_enabled = false
+
+    result_configuration {
+      # Связываем Athena с бакетом для результатов
+      output_location = "s3://${aws_s3_bucket.athena_results.bucket}/"
+    }
+  }
+}

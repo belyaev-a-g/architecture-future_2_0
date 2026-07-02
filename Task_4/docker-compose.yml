@@ -1,0 +1,32 @@
+services:
+  # Эмулятор AWS
+  ministack:
+    container_name: ministack_aws
+    image: ministackorg/ministack:latest
+    ports:
+      - "4566:4566"
+    networks:
+      - tf_network
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  # Контейнер-раннер для Terraform
+  terraform:
+    container_name: terraform_runner
+    image: hashicorp/terraform:latest
+    # Заставляем контейнер не умирать, а ждать наших команд в фоне
+    entrypoint: ["sleep", "infinity"]
+    networks:
+      - tf_network
+    volumes:
+      # Пробрасываем вашу хостовую папку с конфигами
+      - /home/alex/projects/yandex/sprint_11/terra/configs:/workspace
+    working_dir: /workspace
+    # Говорим, что terraform зависит от старта министека
+    depends_on:
+      - ministack
+
+networks:
+  tf_network:
+    driver: bridge
+
